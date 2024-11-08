@@ -1,0 +1,8 @@
+[package]
+name = "dragonet"
+version = "0.0.0"
+edition = "2021"
+description = "A protocol framework that automatically generates networking code."
+license = "Apache-2.0"
+
+[dependencies]
