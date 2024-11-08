@@ -1,7 +1,23 @@
 use crate::buffer::PacketBuf;
 
-pub trait Protocol {
-    fn encode(&self, packet: &Self) -> PacketBuf;
+pub enum PacketDirection {
+    Clientbound,
+    Serverbound
+}
+
+pub trait PacketState {
+    fn get_state_by_id(id: u8) -> Self; 
+}
+
+pub struct PacketMetadata<S: PacketState> {
+    id: u32,
+    state: S,
+    direction: PacketDirection
+}
+
+pub trait Protocol<S: PacketState> {
+    fn encode(&self) -> PacketBuf;
     fn decode(&self, buf: PacketBuf) -> Self;
-    fn size_of(packet: &Self) -> u32;
+    fn size_of(&self) -> u32;
+    fn metadata(&self) -> PacketMetadata<S>;
 }
