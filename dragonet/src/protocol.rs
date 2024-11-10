@@ -10,9 +10,9 @@ pub trait PacketState {
 }
 
 pub struct PacketMetadata<S: PacketState> {
-    id: u32,
-    state: S,
-    direction: PacketDirection
+    pub id: u32,
+    pub state: S,
+    pub direction: PacketDirection
 }
 
 pub trait Protocol<S: PacketState> {

@@ -1,5 +1,6 @@
 #![allow(unused)]
 
-mod protocol;
-mod server;
-mod buffer;
+pub mod protocol;
+pub mod server;
+pub mod buffer;
+pub mod client;
