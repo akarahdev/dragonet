@@ -1,3 +1,4 @@
+use std::net::{Ipv4Addr, SocketAddrV4};
 use dragonet::buffer::PacketBuf;
 use dragonet::server::Server;
 use dragonet::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
@@ -41,7 +42,18 @@ impl Protocol<ProtocolState> for Packets {
     }
 }
 
+// TODO: turn into proc macro
 pub fn main() {
     let mut server: Server<ProtocolState, Packets> = Server::new();
+    server_provider(&mut server);
     server.event_loop();
+}
+
+fn server_provider(server: &mut Server<ProtocolState, Packets>) -> &mut Server<ProtocolState, Packets> {
+    server
+        .with_address(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 2000))
+        .with_packet_event(|connection, packet| {
+            
+        })
+
 }
