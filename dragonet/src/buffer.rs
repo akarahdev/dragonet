@@ -1,3 +1,5 @@
+use std::ops::{BitAnd, BitOr, Not, Shl};
+
 pub struct PacketBuf {
     vector: Vec<u8>,
     read_index: usize,
@@ -29,7 +31,7 @@ impl PacketBuf {
     pub fn read_i8(&mut self) -> i8 {
         self.read_index += 1;
         i8::from_be_bytes([
-            self.vector[self.read_index -1]
+            self.vector[self.read_index - 1]
         ])
     }
 
@@ -40,7 +42,7 @@ impl PacketBuf {
     pub fn read_u8(&mut self) -> u8 {
         self.read_index += 1;
         u8::from_be_bytes([
-            self.vector[self.read_index -1]
+            self.vector[self.read_index - 1]
         ])
     }
 
@@ -165,6 +167,45 @@ impl PacketBuf {
         self.read_index += 16;
         u128::from_be_bytes(self.int128_slice())
     }
+
+    const SEGMENT_BITS: i64 = 0x7F;
+    const CONTINUE_BIT: i64 = 0x80;
+
+    pub fn read_var_int(&mut self) -> i64 {
+        let mut value: i64 = 0;
+        let mut position = 0;
+
+        loop {
+            let current_byte = self.read_u8();
+
+            value |= (current_byte as i64 & (PacketBuf::SEGMENT_BITS)) << position;
+
+            println!("value: {}", value);
+            println!("ifc: {}", current_byte & (PacketBuf::CONTINUE_BIT as u8));
+
+            if (current_byte & (PacketBuf::CONTINUE_BIT as u8)) == 0 { break; }
+
+            position += 7;
+        }
+
+        value
+    }
+
+    pub fn write_var_int(&mut self, mut value: i64) {
+        let mut position = 0;
+
+        loop {
+            println!("r: {}", (value & !PacketBuf::SEGMENT_BITS));
+            if (value & !PacketBuf::SEGMENT_BITS) == 0 {
+                self.write_u8(value as u8);
+                return;
+            }
+
+            self.write_u8((((value & 0xFF) & PacketBuf::SEGMENT_BITS) | PacketBuf::CONTINUE_BIT) as u8);
+
+            value = ((value as u64) >> 7) as i64;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -174,5 +215,8 @@ pub mod tests {
     #[test]
     pub fn test_buffer() {
         let mut buf = PacketBuf::new();
+        buf.write_var_int(328033232455);
+        println!("{:?}", buf.vector);
+        println!("{}", buf.read_var_int());
     }
 }
