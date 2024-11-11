@@ -18,7 +18,7 @@ fn server_provider(server: &mut Server<ProtocolState, Packets>) -> &mut Server<P
             std::thread::spawn(move || {
                 connection.send_packet(Packets::S2CChatMessage);
             });
-           
+
         })
         .with_packet_event(|connection, packet| {
             match packet {

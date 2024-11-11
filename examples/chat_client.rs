@@ -1,12 +1,8 @@
 mod chat;
 
-use std::io::stdin;
 use std::net::{Ipv4Addr, SocketAddrV4};
-use std::sync::{Arc, Mutex};
-use dragonet::server::Server;
 use chat::{Packets, ProtocolState};
 use dragonet::client::Client;
-use crate::chat::Packets::C2SChatMessage;
 
 pub fn main() {
     let mut client: Client<ProtocolState, Packets> = Client::new();
