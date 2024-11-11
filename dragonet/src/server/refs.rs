@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 use crate::protocol::{PacketState, Protocol};
 use crate::server::conn::ServerConnection;
+use crate::server::Server;
 
 pub struct ConnectionRef<S, T>
 where
@@ -45,3 +46,27 @@ where
     S: PacketState,
     T: Protocol<S>,
 {}
+
+
+pub struct ServerRef<S: PacketState, T: Protocol<S>> {
+    server: Arc<Mutex<Server<S, T>>>
+}
+
+unsafe impl<S: PacketState, T: Protocol<S>> Send for ServerRef<S, T> {}
+unsafe impl<S: PacketState, T: Protocol<S>> Sync for ServerRef<S, T> {}
+
+impl<S: PacketState, T: Protocol<S>> Clone for ServerRef<S, T> {
+    fn clone(&self) -> Self {
+        ServerRef { server: self.server.clone() }
+    }
+}
+
+impl<S: PacketState, T: Protocol<S>> ServerRef<S, T> {
+    pub fn connections() -> Vec<ConnectionRef<S, T>> {
+        todo!()
+    }
+    
+    pub fn broadcast(packet: T) {
+        todo!()
+    }
+}
