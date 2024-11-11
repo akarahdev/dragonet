@@ -10,5 +10,9 @@ dragonet = { path = "../dragonet" }
 
 
 [[example]]
-name = "echo"
-path = "echo.rs"
+name = "chat_server"
+path = "chat_server.rs"
+
+[[example]]
+name = "chat_client"
+path = "chat_client.rs"

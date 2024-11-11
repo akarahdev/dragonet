@@ -10,7 +10,7 @@ use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use mio::event::Event;
 use crate::buffer::PacketBuf;
-use crate::protocol::{PacketState, Protocol};
+use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
 
 static mut CONNECTION_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -22,6 +22,7 @@ where
     token: Token,
     stream: TcpStream,
     packet_queue: Vec<T>,
+    state: Option<S>,
     _phantom: PhantomData<(S, T)>,
 }
 
@@ -30,8 +31,14 @@ where
     S: PacketState,
     T: Protocol<S>,
 {
-    pub fn send_packet(&mut self, packet: S) -> &mut ServerConnection<S, T> {
+    pub fn set_state(&mut self, state: S) -> &mut ServerConnection<S, T> {
+        self.state = Some(state);
+        self
+    }
+
+    pub fn send_packet(&mut self, packet: T) -> &mut ServerConnection<S, T> {
         // TODO: write to connection
+        self.packet_queue.push(packet);
         self
     }
 }
@@ -42,7 +49,8 @@ where
     T: Protocol<S>,
 {
     socket: Option<TcpListener>,
-    events: Vec<Box<dyn Fn(&ServerConnection<S, T>, &T)>>,
+    conn_events: Vec<fn(&mut ServerConnection<S, T>)>,
+    recv_events: Vec<fn(&mut ServerConnection<S, T>, &T)>,
     connections: HashMap<Token, ServerConnection<S, T>>,
     _phantom: PhantomData<(S, T)>,
 }
@@ -59,8 +67,10 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         Server {
             socket: None,
             connections: HashMap::new(),
-            events: Vec::new(),
+            conn_events: Vec::new(),
+            recv_events: Vec::new(),
             _phantom: PhantomData,
+
         }
     }
 
@@ -69,8 +79,13 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         self
     }
 
-    pub fn with_packet_event<F: Fn(&ServerConnection<S, T>, &T) + 'static>(&mut self, function: F) -> &mut Server<S, T> {
-        self.events.push(Box::new(function));
+    pub fn with_connection_event(&mut self, function: fn(&mut ServerConnection<S, T>)) -> &mut Server<S, T> {
+        self.conn_events.push(function);
+        self
+    }
+
+    pub fn with_packet_event(&mut self, function: fn(&mut ServerConnection<S, T>, &T)) -> &mut Server<S, T> {
+        self.recv_events.push(function);
         self
     }
 
@@ -124,13 +139,20 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
                                 token,
                                 stream: connection,
                                 packet_queue: vec![],
+                                state: None,
                                 _phantom: PhantomData,
                             },
                         );
+
+                        for event in &self.conn_events {
+                            event(self.connections.get_mut(&token).expect("connection is guaranteed present here"));
+                        }
                     }
                     token => {
-                        let done = if let Some(connection) = self.connections.get_mut(&token) {
-                            Self::handle_connection_event(connection, event)
+                        let events = self.recv_events.clone();
+                        let tc = { self.connections.get_mut(&token) };
+                        let done = if let Some(connection) = tc {
+                            Self::handle_connection_event(connection, event, &events)
                         } else {
                             // ignore sporadic event
                             false
@@ -149,13 +171,14 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
     fn handle_connection_event(
         connection: &mut ServerConnection<S, T>,
         event: &Event,
+        events: &Vec<fn(&mut ServerConnection<S, T>, &T)>
     ) -> bool {
         if event.is_readable() {
-            Server::handle_connection_read(connection, event);
+            Self::handle_connection_read(connection, event, events);
         }
 
         if event.is_writable() {
-            Server::handle_connection_write(connection, event);
+            Self::handle_connection_write(connection, event);
         }
 
         false
@@ -164,6 +187,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
     fn handle_connection_read(
         connection: &mut ServerConnection<S, T>,
         event: &Event,
+        events: &Vec<fn(&mut ServerConnection<S, T>, &T)>
     ) -> bool {
         let mut connection_closed = false;
         let mut data_buf = PacketBuf::with_capacity(1024);
@@ -197,6 +221,19 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
 
         if bytes_read != 0 {
             data_buf.resize(bytes_read);
+
+            let length = data_buf.read_var_int();
+            let id = data_buf.read_var_int();
+            let meta = PacketMetadata {
+                id: id as u32,
+                state: connection.state.clone().unwrap(),
+                direction: PacketDirection::Serverbound,
+            };
+            let packet = T::decode(&mut data_buf, &meta);
+
+            for event in events {
+                event(connection, &packet);
+            }
             println!("{:?}", data_buf);
         }
 
