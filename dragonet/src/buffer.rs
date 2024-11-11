@@ -26,8 +26,16 @@ impl PacketBuf {
         }
     }
 
+    pub fn as_array(&self) -> &[u8] {
+        self.vector.as_ref()
+    }
+
     pub fn reset_reading(&mut self) {
         self.read_index;
+    }
+
+    pub fn write_all(&mut self, buf: &PacketBuf) {
+        self.vector.extend_from_slice(&buf.vector);
     }
 
     pub fn write_i8(&mut self, value: i8) {

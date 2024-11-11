@@ -1,11 +1,15 @@
 use std::alloc::System;
+use std::any::Any;
 use std::collections::HashMap;
 use std::io::ErrorKind::WouldBlock;
+use std::io::Write;
 use std::marker::PhantomData;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
+use mio::event::Event;
+use crate::buffer::PacketBuf;
 use crate::protocol::{PacketState, Protocol};
 
 static mut CONNECTION_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -17,6 +21,7 @@ where
 {
     token: Token,
     stream: TcpStream,
+    packet_queue: Vec<T>,
     _phantom: PhantomData<(S, T)>,
 }
 
@@ -110,13 +115,20 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
                         ).unwrap();
                         
                         println!("Accepted connection from {}", address);
+
+                        self.connections.insert(
+                            token,
+                            ServerConnection {
+                                token,
+                                stream: connection,
+                                packet_queue: vec![],
+                                _phantom: PhantomData,
+                            }
+                        );
                     }
                     token => {
                         let done = if let Some(connection) = self.connections.get_mut(&token) {
-                            // logic here...
-                            // logic should be extrapolated to a seperate function
-                            // false is a placeholder
-                            false
+                            Self::handle_connection_event(connection, event)
                         } else {
                             // ignore sporadic event
                             false
@@ -130,6 +142,29 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
                 }
             }
         }
+    }
+
+    pub fn handle_connection_event(
+        connection: &mut ServerConnection<S, T>,
+        event: &Event
+    ) -> bool {
+        if event.is_readable() {
+
+        }
+
+        if event.is_writable() {
+            for packet in &connection.packet_queue {
+                let length = packet.size_of();
+                let mut buf = PacketBuf::new();
+                buf.write_var_int(length as i64);
+                buf.write_var_int(packet.metadata().id as i64);
+                buf.write_all(&packet.encode());
+                connection.stream.write_all(buf.as_array());
+            }
+            connection.packet_queue.clear();
+        }
+
+        false
     }
 }
 
