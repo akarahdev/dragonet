@@ -5,6 +5,7 @@ use std::io::ErrorKind::{Interrupted, WouldBlock};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
@@ -13,6 +14,51 @@ use crate::buffer::PacketBuf;
 use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
 
 static mut CONNECTION_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+
+pub struct ConnectionRef<S, T>
+where
+    S: PacketState,
+    T: Protocol<S>,
+{
+    connection: Arc<Mutex<ServerConnection<S, T>>>,
+}
+
+impl<S, T> ConnectionRef<S, T>
+where
+    S: PacketState,
+    T: Protocol<S>,
+{
+    pub fn set_state(&self, state: S) {
+        self.connection.lock().unwrap().state = Some(state);
+    }
+
+    pub fn send_packet(&self, packet: T) {
+        self.connection.lock().unwrap().packet_queue.push(packet);
+    }
+}
+
+impl<S, T> Clone for ConnectionRef<S, T>
+where
+    S: PacketState,
+    T: Protocol<S>,
+{
+    fn clone(&self) -> Self {
+        ConnectionRef { connection: self.connection.clone() }
+    }
+}
+
+unsafe impl<S, T> Send for ConnectionRef<S, T>
+where
+    S: PacketState,
+    T: Protocol<S>,
+{}
+
+unsafe impl<S, T> Sync for ConnectionRef<S, T>
+where
+    S: PacketState,
+    T: Protocol<S>,
+{}
 
 pub struct ServerConnection<S, T>
 where
@@ -49,9 +95,9 @@ where
     T: Protocol<S>,
 {
     socket: Option<TcpListener>,
-    conn_events: Vec<fn(&mut ServerConnection<S, T>)>,
-    recv_events: Vec<fn(&mut ServerConnection<S, T>, &T)>,
-    connections: HashMap<Token, ServerConnection<S, T>>,
+    conn_events: Vec<fn(ConnectionRef<S, T>)>,
+    recv_events: Vec<fn(ConnectionRef<S, T>, &T)>,
+    connections: HashMap<Token, Arc<Mutex<ServerConnection<S, T>>>>,
     _phantom: PhantomData<(S, T)>,
 }
 
@@ -79,12 +125,12 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         self
     }
 
-    pub fn with_connection_event(&mut self, function: fn(&mut ServerConnection<S, T>)) -> &mut Server<S, T> {
+    pub fn with_connection_event(&mut self, function: fn(ConnectionRef<S, T>)) -> &mut Server<S, T> {
         self.conn_events.push(function);
         self
     }
 
-    pub fn with_packet_event(&mut self, function: fn(&mut ServerConnection<S, T>, &T)) -> &mut Server<S, T> {
+    pub fn with_packet_event(&mut self, function: fn(ConnectionRef<S, T>, &T)) -> &mut Server<S, T> {
         self.recv_events.push(function);
         self
     }
@@ -131,31 +177,35 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
 
                         self.connections.insert(
                             token,
-                            ServerConnection {
-                                token,
-                                stream: connection,
-                                packet_queue: vec![],
-                                state: None,
-                                _phantom: PhantomData,
-                            },
+                            Arc::new(Mutex::new(
+                                ServerConnection {
+                                    token,
+                                    stream: connection,
+                                    packet_queue: vec![],
+                                    state: None,
+                                    _phantom: PhantomData,
+                                }
+                            )),
                         );
 
                         for event in &self.conn_events {
-                            event(self.connections.get_mut(&token).expect("connection is guaranteed present here"));
+                            let arc = self.connections.get_mut(&token).expect("connection is guaranteed present here").clone();
+                            let reference = ConnectionRef { connection: arc };
+                            event(reference);
                         }
                     }
                     token => {
                         let events = self.recv_events.clone();
-                        let tc = { self.connections.get_mut(&token) };
+                        let tc = { self.connections.get(&token) };
                         let done = if let Some(connection) = tc {
-                            Self::handle_connection_event(connection, event, &events)
+                            Self::handle_connection_event(connection.clone(), event, &events)
                         } else {
                             // ignore sporadic event
                             false
                         };
                         if done {
                             if let Some(mut connection) = self.connections.remove(&token) {
-                                poll.registry().deregister(&mut connection.stream).unwrap();
+                                poll.registry().deregister(&mut connection.lock().unwrap().stream).unwrap();
                             }
                         }
                     }
@@ -165,32 +215,32 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
     }
 
     fn handle_connection_event(
-        connection: &mut ServerConnection<S, T>,
+        connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
-        events: &Vec<fn(&mut ServerConnection<S, T>, &T)>
+        events: &Vec<fn(ConnectionRef<S, T>, &T)>,
     ) -> bool {
         if event.is_readable() {
-            Self::handle_connection_read(connection, event, events);
+            Self::handle_connection_read(connection.clone(), event, events);
         }
 
         if event.is_writable() {
-            Self::handle_connection_write(connection, event);
+            Self::handle_connection_write(connection.clone(), event, events);
         }
 
         false
     }
 
     fn handle_connection_read(
-        connection: &mut ServerConnection<S, T>,
+        connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
-        events: &Vec<fn(&mut ServerConnection<S, T>, &T)>
+        events: &Vec<fn(ConnectionRef<S, T>, &T)>,
     ) -> bool {
         let mut connection_closed = false;
         let mut data_buf = PacketBuf::with_capacity(1024);
         let mut bytes_read = 0;
 
         loop {
-            let m = connection.stream.read(data_buf.as_mut_array());
+            let m = connection.clone().lock().unwrap().stream.read(data_buf.as_mut_array());
             match m {
                 Ok(n) => {
                     if n == 0 {
@@ -219,13 +269,14 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
             let id = data_buf.read_var_int();
             let meta = PacketMetadata {
                 id: id as u32,
-                state: connection.state.clone().unwrap(),
+                state: connection.clone().lock().unwrap().state.clone().unwrap(),
                 direction: PacketDirection::Serverbound,
             };
             let packet = T::decode(&mut data_buf, &meta);
 
             for event in events {
-                event(connection, &packet);
+                let rf = ConnectionRef { connection: connection.clone() };
+                event(rf, &packet);
             }
         }
 
@@ -233,19 +284,38 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
     }
 
     pub fn handle_connection_write(
-        connection: &mut ServerConnection<S, T>,
+        connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
+        events: &Vec<fn(ConnectionRef<S, T>, &T)>,
     ) -> bool {
-        // write all packets in the queue per the specification
-        for packet in &connection.packet_queue {
+        
+        /*
+        let mut r = rf.lock();
+
+        if !r.packet_queue.is_empty() {
+            let packet = r.packet_queue.remove(0);
             let length = packet.size_of();
             let mut buf = PacketBuf::new();
             buf.write_var_int(length as i64);
             buf.write_var_int(packet.metadata().id as i64);
             buf.write_all(&packet.encode());
-            connection.stream.write_all(buf.as_array());
+            r.socket.as_mut().unwrap().write_all(buf.as_mut_array()).unwrap();
         }
-        connection.packet_queue.clear();
+         */
+        // write all packets in the queue per the specification
+        
+        let cl = connection.clone();
+        let mut rf = cl.lock().unwrap();
+        while !rf.packet_queue.is_empty() {
+            let packet = rf.packet_queue.remove(0);
+            let length = packet.size_of();
+            let mut buf = PacketBuf::new();
+            buf.write_var_int(length as i64);
+            buf.write_var_int(packet.metadata().id as i64);
+            buf.write_all(&packet.encode());
+            rf.stream.write_all(buf.as_mut_array()).unwrap();
+        }
+        rf.packet_queue.clear();
         false
     }
 }

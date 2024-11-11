@@ -18,8 +18,8 @@ fn client_provider(client: &mut Client<ProtocolState, Packets>) -> &mut Client<P
     client
         .with_address(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 2000))
         .on_connect(|clr| {
+            clr.set_state(ProtocolState::Chat);
             std::thread::spawn(move || {
-                clr.set_state(ProtocolState::Chat);
                 clr.send_packet(Packets::S2CChatMessage);
             });
         })

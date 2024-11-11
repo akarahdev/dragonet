@@ -15,7 +15,10 @@ fn server_provider(server: &mut Server<ProtocolState, Packets>) -> &mut Server<P
         .with_address(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 2000))
         .with_connection_event(|connection| {
             connection.set_state(ProtocolState::Chat);
-            connection.send_packet(Packets::S2CChatMessage);
+            std::thread::spawn(move || {
+                connection.send_packet(Packets::S2CChatMessage);
+            });
+           
         })
         .with_packet_event(|connection, packet| {
             match packet {
