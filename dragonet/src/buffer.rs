@@ -5,6 +5,12 @@ pub struct PacketBuf {
     read_index: usize,
 }
 
+impl Default for PacketBuf {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PacketBuf {
     pub fn new() -> PacketBuf {
         PacketBuf {

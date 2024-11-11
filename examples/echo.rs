@@ -21,8 +21,8 @@ enum Packets {
 
 impl Protocol<ProtocolState> for Packets {
     fn encode(&self) -> PacketBuf {
-        let mut buf = PacketBuf::new();
-        buf
+        
+        PacketBuf::new()
     }
 
     fn decode(&self, buf: PacketBuf) -> Self {

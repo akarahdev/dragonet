@@ -43,13 +43,19 @@ where
 }
 
 
+impl<S: PacketState, T: Protocol<S>> Default for Server<S, T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<S: PacketState, T: Protocol<S>> Server<S, T> {
     pub fn new() -> Server<S, T> {
         Server {
             socket: None,
             connections: HashMap::new(),
             events: Vec::new(),
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 
