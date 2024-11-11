@@ -55,5 +55,4 @@ fn server_provider(server: &mut Server<ProtocolState, Packets>) -> &mut Server<P
         .with_packet_event(|connection, packet| {
             
         })
-
 }

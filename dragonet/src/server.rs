@@ -1,8 +1,8 @@
 use std::alloc::System;
 use std::any::Any;
 use std::collections::HashMap;
-use std::io::ErrorKind::WouldBlock;
-use std::io::Write;
+use std::io::ErrorKind::{Interrupted, WouldBlock};
+use std::io::{Read, Write};
 use std::marker::PhantomData;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -76,7 +76,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
 
     pub fn event_loop(&mut self) {
         const SERVER_TOKEN: Token = Token(0);
-        
+
         unsafe { CONNECTION_ID_COUNTER.fetch_add(1, Ordering::AcqRel); }
 
         let mut poll = Poll::new().unwrap();
@@ -103,17 +103,19 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
                     SERVER_TOKEN => {
                         let (mut connection, address) = match socket.accept() {
                             Ok((connection, address)) => (connection, address),
-                            Err(e) if e.kind() == WouldBlock => { break; },
+                            Err(e) if e.kind() == WouldBlock => { break; }
                             Err(e) => { panic!("{}", e); }
                         };
+
                         let incremented = unsafe { CONNECTION_ID_COUNTER.fetch_add(1, Ordering::AcqRel) };
                         let token = Token(incremented);
+
                         poll.registry().register(
                             &mut connection,
                             token,
-                            Interest::READABLE | Interest::WRITABLE
+                            Interest::READABLE | Interest::WRITABLE,
                         ).unwrap();
-                        
+
                         println!("Accepted connection from {}", address);
 
                         self.connections.insert(
@@ -123,7 +125,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
                                 stream: connection,
                                 packet_queue: vec![],
                                 _phantom: PhantomData,
-                            }
+                            },
                         );
                     }
                     token => {
@@ -144,26 +146,77 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         }
     }
 
-    pub fn handle_connection_event(
+    fn handle_connection_event(
         connection: &mut ServerConnection<S, T>,
-        event: &Event
+        event: &Event,
     ) -> bool {
         if event.is_readable() {
-
+            Server::handle_connection_read(connection, event);
         }
 
         if event.is_writable() {
-            for packet in &connection.packet_queue {
-                let length = packet.size_of();
-                let mut buf = PacketBuf::new();
-                buf.write_var_int(length as i64);
-                buf.write_var_int(packet.metadata().id as i64);
-                buf.write_all(&packet.encode());
-                connection.stream.write_all(buf.as_array());
-            }
-            connection.packet_queue.clear();
+            Server::handle_connection_write(connection, event);
         }
 
+        false
+    }
+
+    fn handle_connection_read(
+        connection: &mut ServerConnection<S, T>,
+        event: &Event,
+    ) -> bool {
+        let mut connection_closed = false;
+        let mut data_buf = PacketBuf::with_capacity(1024);
+        let mut bytes_read = 0;
+
+        loop {
+            let m = connection.stream.read(data_buf.as_mut_array());
+            println!("{:?}", m);
+            match m {
+                Ok(n) => {
+                    if n == 0 {
+                        connection_closed = true;
+                        break;
+                    }
+                    bytes_read += n;
+                    data_buf.resize(data_buf.length() + bytes_read * 2);
+                }
+                Err(ref err) => {
+                    if err.kind() == WouldBlock {
+                        break;
+                    }
+                    if err.kind() == Interrupted {
+                        continue;
+                    }
+                    panic!("{}", err);
+                }
+            }
+        }
+
+        println!("bytes read: {}", bytes_read);
+
+        if bytes_read != 0 {
+            data_buf.resize(bytes_read);
+            println!("{:?}", data_buf);
+        }
+
+        connection_closed
+    }
+
+    pub fn handle_connection_write(
+        connection: &mut ServerConnection<S, T>,
+        event: &Event,
+    ) -> bool {
+        // write all packets in the queue per the specification
+        for packet in &connection.packet_queue {
+            let length = packet.size_of();
+            let mut buf = PacketBuf::new();
+            buf.write_var_int(length as i64);
+            buf.write_var_int(packet.metadata().id as i64);
+            buf.write_all(&packet.encode());
+            connection.stream.write_all(buf.as_array());
+        }
+        connection.packet_queue.clear();
         false
     }
 }

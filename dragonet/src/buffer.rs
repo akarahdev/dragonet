@@ -1,5 +1,6 @@
 use std::ops::{BitAnd, BitOr, Not, Shl};
 
+#[derive(Debug)]
 pub struct PacketBuf {
     vector: Vec<u8>,
     read_index: usize,
@@ -14,14 +15,14 @@ impl Default for PacketBuf {
 impl PacketBuf {
     pub fn new() -> PacketBuf {
         PacketBuf {
-            vector: Vec::new(),
+            vector: vec![],
             read_index: 0,
         }
     }
 
     pub fn with_capacity(capacity: usize) -> PacketBuf {
         PacketBuf {
-            vector: Vec::with_capacity(capacity),
+            vector: vec![0; capacity],
             read_index: 0,
         }
     }
@@ -30,12 +31,36 @@ impl PacketBuf {
         self.vector.as_ref()
     }
 
+    pub fn as_mut_array(&mut self) -> &mut [u8] {
+        self.vector.as_mut()
+    }
+    
+    pub fn resize(&mut self, new_length: usize) {
+        if new_length <= self.vector.len() {
+            self.vector.truncate(new_length);    
+        } else {
+            self.vector.resize(new_length, 0);
+        }
+    }
+    
+    pub fn length(&self) -> usize {
+        self.vector.len()
+    }
+    
+    pub fn capacity(&self) -> usize {
+        self.vector.capacity()
+    }
+
     pub fn reset_reading(&mut self) {
         self.read_index;
     }
 
     pub fn write_all(&mut self, buf: &PacketBuf) {
         self.vector.extend_from_slice(&buf.vector);
+    }
+
+    pub fn write_slice(&mut self, slice: &[u8]) {
+        self.vector.extend_from_slice(slice);
     }
 
     pub fn write_i8(&mut self, value: i8) {
