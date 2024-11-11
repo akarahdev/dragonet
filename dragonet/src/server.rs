@@ -212,7 +212,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
                     if err.kind() == Interrupted {
                         continue;
                     }
-                    panic!("{}", err);
+                    return true;
                 }
             }
         }

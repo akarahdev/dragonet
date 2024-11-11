@@ -26,18 +26,19 @@ where
     _phantom: PhantomData<(S, T)>,
 }
 
-pub struct ClientRef<'a, S, T>
+pub struct ClientRef<S, T>
 where
     S: PacketState,
     T: Protocol<S>,
 {
-    client: Arc<Mutex<&'a mut Client<S, T>>>,
+    client: Arc<Mutex<Client<S, T>>>,
 }
 
-impl<'a, S, T> Clone for ClientRef<'a, S, T>
+impl<S, T> Clone for ClientRef<S, T>
 where
     S: PacketState,
-    T: Protocol<S> {
+    T: Protocol<S>,
+{
     fn clone(&self) -> Self {
         ClientRef {
             client: self.client.clone()
@@ -45,7 +46,7 @@ where
     }
 }
 
-impl<'a, S, T> ClientRef<'a, S, T>
+impl<S, T> ClientRef<S, T>
 where
     S: PacketState,
     T: Protocol<S>,
@@ -53,12 +54,12 @@ where
     pub fn set_state(&self, state: S) {
         self.client.lock().unwrap().state = Some(state);
     }
-    
+
     pub fn send_packet(&self, packet: T) {
         self.client.lock().unwrap().packet_queue.push(packet);
     }
 
-    fn lock(&self) -> MutexGuard<'_, &'a mut Client<S, T>> {
+    fn lock(&self) -> MutexGuard<'_, Client<S, T>> {
         self.client.lock().unwrap()
     }
 }
@@ -97,7 +98,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
         self
     }
 
-    pub fn event_loop(&mut self) {
+    pub fn event_loop(mut self) {
         const SERVER_TOKEN: Token = Token(0);
 
         let mut poll = Poll::new().unwrap();
@@ -117,15 +118,15 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
         println!("got here a");
 
 
-        let init_ref = ClientRef {
+        let rf = ClientRef {
             client: Arc::new(Mutex::new(self)),
         };
 
         let func = {
             println!("got here b");
-            init_ref.lock().on_connection.clone()
+            rf.lock().on_connection.clone()
         };
-        func(init_ref.clone());
+        func(rf.clone());
 
         println!("got here c");
 
@@ -137,10 +138,10 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             for event in events.iter() {
                 match event.token() {
                     SERVER_TOKEN => {
-                        if self.handle_connection_event(event) {
-                           return;
+                        if Self::handle_connection_event(rf.clone(), event) {
+                            return;
                         }
-                    },
+                    }
                     _ => panic!("unknown token")
                 }
             }
@@ -148,30 +149,31 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
     }
 
     fn handle_connection_event(
-        &mut self,
+        rf: ClientRef<S, T>,
         event: &Event,
     ) -> bool {
         if event.is_readable() {
-            self.handle_connection_read(event);
+            Self::handle_connection_read(rf.clone(), event);
         }
 
         if event.is_writable() {
-            self.handle_connection_write(event);
+            Self::handle_connection_write(rf.clone(), event);
         }
 
         false
     }
 
     fn handle_connection_read(
-        &mut self,
+        rf: ClientRef<S, T>,
         event: &Event,
     ) -> bool {
         let mut connection_closed = false;
         let mut data_buf = PacketBuf::with_capacity(1024);
         let mut bytes_read = 0;
 
+
         loop {
-            let m = self.socket.as_mut().unwrap().read(data_buf.as_mut_array());
+            let m = rf.lock().socket.as_mut().unwrap().read(data_buf.as_mut_array());
             println!("{:?}", m);
             match m {
                 Ok(n) => {
@@ -204,17 +206,14 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             let id = data_buf.read_var_int();
             let meta = PacketMetadata {
                 id: id as u32,
-                state: self.state.clone().unwrap(),
+                state: rf.lock().state.clone().unwrap(),
                 direction: PacketDirection::Clientbound,
             };
             let packet = T::decode(&mut data_buf, &meta);
-            let events = self.events.clone();
-            let refer = ClientRef {
-                client: Arc::new(Mutex::new(self))
-            };
+            let events = rf.lock().events.clone();
 
             for event in events {
-                event(&refer, &packet);
+                event(&rf.clone(), &packet);
             }
             println!("{:?}", data_buf);
         }
@@ -223,19 +222,23 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
     }
 
     pub fn handle_connection_write(
-        &mut self,
+        rf: ClientRef<S, T>,
         event: &Event,
     ) -> bool {
         // write all packets in the queue per the specification
-        for packet in &self.packet_queue {
+
+        let mut r = rf.lock();
+
+        if !r.packet_queue.is_empty() {
+            let packet = r.packet_queue.remove(0);
             let length = packet.size_of();
             let mut buf = PacketBuf::new();
             buf.write_var_int(length as i64);
             buf.write_var_int(packet.metadata().id as i64);
             buf.write_all(&packet.encode());
-            self.socket.as_mut().unwrap().write_all(buf.as_array());
+            r.socket.as_mut().unwrap().write_all(buf.as_mut_array()).unwrap();
         }
-        self.packet_queue.clear();
+        
         false
     }
 }
