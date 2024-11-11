@@ -115,25 +115,18 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
         poll.registry()
             .register(socket, SERVER_TOKEN, Interest::READABLE | Interest::WRITABLE);
 
-        println!("got here a");
-
 
         let rf = ClientRef {
             client: Arc::new(Mutex::new(self)),
         };
 
         let func = {
-            println!("got here b");
             rf.lock().on_connection.clone()
         };
         func(rf.clone());
 
-        println!("got here c");
-
         loop {
             poll.poll(&mut events, None);
-
-            println!("events: {:?}", events);
 
             for event in events.iter() {
                 match event.token() {
@@ -174,10 +167,8 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
 
         loop {
             let m = rf.lock().socket.as_mut().unwrap().read(data_buf.as_mut_array());
-            println!("{:?}", m);
             match m {
                 Ok(n) => {
-                    println!("read client data: {}", n);
                     if n == 0 {
                         connection_closed = true;
                         break;
@@ -197,8 +188,6 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             }
         }
 
-        println!("bytes read: {}", bytes_read);
-
         if bytes_read != 0 {
             data_buf.resize(bytes_read);
 
@@ -215,7 +204,6 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             for event in events {
                 event(&rf.clone(), &packet);
             }
-            println!("{:?}", data_buf);
         }
 
         connection_closed
@@ -238,7 +226,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             buf.write_all(&packet.encode());
             r.socket.as_mut().unwrap().write_all(buf.as_mut_array()).unwrap();
         }
-        
+
         false
     }
 }

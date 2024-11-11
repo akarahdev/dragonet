@@ -34,19 +34,19 @@ impl PacketBuf {
     pub fn as_mut_array(&mut self) -> &mut [u8] {
         self.vector.as_mut()
     }
-    
+
     pub fn resize(&mut self, new_length: usize) {
         if new_length <= self.vector.len() {
-            self.vector.truncate(new_length);    
+            self.vector.truncate(new_length);
         } else {
             self.vector.resize(new_length, 0);
         }
     }
-    
+
     pub fn length(&self) -> usize {
         self.vector.len()
     }
-    
+
     pub fn capacity(&self) -> usize {
         self.vector.capacity()
     }
@@ -219,9 +219,6 @@ impl PacketBuf {
 
             value |= (current_byte as i64 & (PacketBuf::SEGMENT_BITS)) << position;
 
-            println!("value: {}", value);
-            println!("ifc: {}", current_byte & (PacketBuf::CONTINUE_BIT as u8));
-
             if (current_byte & (PacketBuf::CONTINUE_BIT as u8)) == 0 { break; }
 
             position += 7;
@@ -234,7 +231,6 @@ impl PacketBuf {
         let mut position = 0;
 
         loop {
-            println!("r: {}", (value & !PacketBuf::SEGMENT_BITS));
             if (value & !PacketBuf::SEGMENT_BITS) == 0 {
                 self.write_u8(value as u8);
                 return;

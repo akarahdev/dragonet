@@ -111,8 +111,6 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         loop {
             poll.poll(&mut events, None);
 
-            println!("{:?}", events);
-
             for event in events.iter() {
                 match event.token() {
                     SERVER_TOKEN => {
@@ -130,8 +128,6 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
                             token,
                             Interest::READABLE | Interest::WRITABLE,
                         ).unwrap();
-
-                        println!("Accepted connection from {}", address);
 
                         self.connections.insert(
                             token,
@@ -195,7 +191,6 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
 
         loop {
             let m = connection.stream.read(data_buf.as_mut_array());
-            println!("{:?}", m);
             match m {
                 Ok(n) => {
                     if n == 0 {
@@ -217,8 +212,6 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
             }
         }
 
-        println!("bytes read: {}", bytes_read);
-
         if bytes_read != 0 {
             data_buf.resize(bytes_read);
 
@@ -234,7 +227,6 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
             for event in events {
                 event(connection, &packet);
             }
-            println!("{:?}", data_buf);
         }
 
         connection_closed
