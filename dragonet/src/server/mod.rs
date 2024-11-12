@@ -21,8 +21,7 @@ use crate::server::refs::{ConnectionRef, ServerRef};
 
 static mut CONNECTION_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-
-
+type ServerPacketEvent<S, T> = fn(ConnectionRef<S, T>, &T);
 
 
 
@@ -33,7 +32,7 @@ where
 {
     socket: Option<TcpListener>,
     conn_events: Vec<fn(ConnectionRef<S, T>)>,
-    recv_events: Vec<fn(ConnectionRef<S, T>, &T)>,
+    recv_events: Vec<ServerPacketEvent<S, T>>,
     startup_events: Vec<fn(ServerRef<S, T>)>,
     connections: HashMap<Token, Arc<Mutex<ServerConnection<S, T>>>>,
     _phantom: PhantomData<(S, T)>,
@@ -73,7 +72,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         self
     }
 
-    pub fn with_packet_event(&mut self, function: fn(ConnectionRef<S, T>, &T)) -> &mut Server<S, T> {
+    pub fn with_packet_event(&mut self, function: ServerPacketEvent<S, T>) -> &mut Server<S, T> {
         self.recv_events.push(function);
         self
     }
@@ -116,8 +115,8 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
             for event in events.iter() {
                 println!("Event: {:?}", event);
                 match event.token() {
-                    SERVER_TOKEN => Self::handle_server_token_event(rf.clone(), &poll, &event),
-                    token => Self::handle_other_token_event(rf.clone(), &poll, &token, &event)
+                    SERVER_TOKEN => Self::handle_server_token_event(rf.clone(), &poll, event),
+                    token => Self::handle_other_token_event(rf.clone(), &poll, &token, event)
                 }
             }
         }
@@ -176,7 +175,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         let mut drf = crf.lock();
 
         let events = drf.recv_events.clone();
-        let tc = { drf.connections.get(&token) };
+        let tc = { drf.connections.get(token) };
         let done = if let Some(connection) = tc {
             Self::handle_connection_event(rf.clone(), connection.clone(), event, &events)
         } else {
@@ -184,7 +183,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
             false
         };
         if done {
-            if let Some(mut connection) = drf.connections.remove(&token) {
+            if let Some(mut connection) = drf.connections.remove(token) {
                 poll.registry().deregister(&mut connection.lock().unwrap().stream).unwrap();
             }
         }

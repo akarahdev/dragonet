@@ -17,13 +17,15 @@ use crate::buffer::PacketBuf;
 use crate::client::refs::ClientRef;
 use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
 
+type ClientPacketEvent<S, T> = fn(ClientRef<S, T>, &T);
+
 pub struct Client<S, T>
 where
     S: PacketState,
     T: Protocol<S>,
 {
     socket: Option<TcpStream>,
-    events: Vec<fn(ClientRef<S, T>, &T)>,
+    events: Vec<ClientPacketEvent<S, T>>,
     on_connection: fn(ClientRef<S, T>),
     packet_queue: Vec<T>,
     state: Option<S>,
@@ -56,7 +58,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
         self
     }
 
-    pub fn with_packet_event(&mut self, function: fn(ClientRef<S, T>, &T)) -> &mut Client<S, T> {
+    pub fn with_packet_event(&mut self, function: ClientPacketEvent<S, T>) -> &mut Client<S, T> {
         self.events.push(function);
         self
     }
@@ -100,7 +102,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
 
                 if event.is_writable() && !had_writing_opportunity {
                     let func = {
-                        rf.lock().on_connection.clone()
+                        rf.lock().on_connection
                     };
                     func(rf.clone());
                 }

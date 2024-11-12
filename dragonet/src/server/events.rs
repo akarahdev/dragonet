@@ -6,14 +6,14 @@ use crate::buffer::PacketBuf;
 use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
 use crate::server::conn::ServerConnection;
 use crate::server::refs::{ConnectionRef, ServerRef};
-use crate::server::Server;
+use crate::server::{Server, ServerPacketEvent};
 
 impl<S: PacketState, T: Protocol<S>> Server<S, T> {
     pub(crate) fn handle_connection_event(
         rf: ServerRef<S, T>,
         connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
-        events: &Vec<fn(ConnectionRef<S, T>, &T)>,
+        events: &[ServerPacketEvent<S, T>],
     ) -> bool {
         if event.is_readable() {
             Self::handle_connection_read(rf.clone(), connection.clone(), event, events);
@@ -30,7 +30,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         rf: ServerRef<S, T>,
         connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
-        events: &Vec<fn(ConnectionRef<S, T>, &T)>,
+        events: &[ServerPacketEvent<S, T>],
     ) -> bool {
         let mut connection_closed = false;
         let mut data_buf = PacketBuf::with_capacity(1024);
@@ -84,7 +84,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         rf: ServerRef<S, T>,
         connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
-        events: &Vec<fn(ConnectionRef<S, T>, &T)>,
+        events: &[ServerPacketEvent<S, T>],
     ) -> bool {
 
         /*

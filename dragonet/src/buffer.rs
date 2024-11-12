@@ -52,7 +52,7 @@ impl PacketBuf {
     }
 
     pub fn reset_reading(&mut self) {
-        self.read_index;
+        self.read_index = 0;
     }
 
     pub fn write_all(&mut self, buf: &PacketBuf) {
@@ -276,7 +276,7 @@ impl PacketBuf {
 
     pub fn write_string(&mut self, value: &str) {
         self.write_var_int(value.len() as i64);
-        self.vector.extend_from_slice(&value.as_bytes());
+        self.vector.extend_from_slice(value.as_bytes());
     }
 
     pub fn read_string(&mut self) -> String {
