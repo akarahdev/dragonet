@@ -241,6 +241,53 @@ impl PacketBuf {
             value = ((value as u64) >> 7) as i64;
         }
     }
+
+    pub fn write_f32(&mut self, value: f32) {
+        self.vector.extend_from_slice(&value.to_be_bytes());
+    }
+
+    pub fn read_f32(&mut self) -> f32 {
+        self.read_index += 4;
+        f32::from_be_bytes([
+            self.vector[self.read_index - 4],
+            self.vector[self.read_index - 3],
+            self.vector[self.read_index - 2],
+            self.vector[self.read_index - 1]
+        ])
+    }
+
+    pub fn write_f64(&mut self, value: f64) {
+        self.vector.extend_from_slice(&value.to_be_bytes());
+    }
+
+    pub fn read_f64(&mut self) -> f64 {
+        self.read_index += 8;
+        f64::from_be_bytes(self.int64_slice())
+    }
+
+    pub fn write_boolean(&mut self, value: bool) {
+        self.vector.push(value as u8);
+    }
+
+    pub fn read_boolean(&mut self) -> bool {
+        self.read_index += 1;
+        self.vector[self.read_index - 1] == 1
+    }
+
+    pub fn write_string(&mut self, value: &str) {
+        self.write_var_int(value.len() as i64);
+        self.vector.extend_from_slice(&value.as_bytes());
+    }
+
+    pub fn read_string(&mut self) -> String {
+        let length = self.read_var_int();
+        let mut str = String::new();
+        for _ in 0..length {
+            self.read_index += 1;
+            str.push(self.vector[self.read_index - 1] as char);
+        };
+        str
+    }
 }
 
 #[cfg(test)]
