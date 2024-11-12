@@ -68,7 +68,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             let events = rf.lock().events.clone();
 
             for event in events {
-                event(&rf.clone(), &packet);
+                event(rf.clone(), &packet);
             }
         }
 

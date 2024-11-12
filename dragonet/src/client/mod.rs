@@ -23,7 +23,7 @@ where
     T: Protocol<S>,
 {
     socket: Option<TcpStream>,
-    events: Vec<fn(&ClientRef<S, T>, &T)>,
+    events: Vec<fn(ClientRef<S, T>, &T)>,
     on_connection: fn(ClientRef<S, T>),
     packet_queue: Vec<T>,
     state: Option<S>,
@@ -56,7 +56,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
         self
     }
 
-    pub fn with_packet_event(&mut self, function: fn(&ClientRef<S, T>, &T)) -> &mut Client<S, T> {
+    pub fn with_packet_event(&mut self, function: fn(ClientRef<S, T>, &T)) -> &mut Client<S, T> {
         self.events.push(function);
         self
     }
@@ -97,6 +97,8 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             poll.poll(&mut events, None);
 
             for event in events.iter() {
+                println!("wow {:?}", event);
+
                 match event.token() {
                     SERVER_TOKEN => {
                         if Self::handle_connection_event(rf.clone(), event) {

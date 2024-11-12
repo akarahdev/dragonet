@@ -5,27 +5,29 @@ use mio::event::Event;
 use crate::buffer::PacketBuf;
 use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
 use crate::server::conn::ServerConnection;
-use crate::server::refs::ConnectionRef;
+use crate::server::refs::{ConnectionRef, ServerRef};
 use crate::server::Server;
 
 impl<S: PacketState, T: Protocol<S>> Server<S, T> {
     pub(crate) fn handle_connection_event(
+        rf: ServerRef<S, T>,
         connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
         events: &Vec<fn(ConnectionRef<S, T>, &T)>,
     ) -> bool {
         if event.is_readable() {
-            Self::handle_connection_read(connection.clone(), event, events);
+            Self::handle_connection_read(rf.clone(), connection.clone(), event, events);
         }
 
         if event.is_writable() {
-            Self::handle_connection_write(connection.clone(), event, events);
+            Self::handle_connection_write(rf.clone(), connection.clone(), event, events);
         }
 
         false
     }
 
     pub(crate) fn handle_connection_read(
+        rf: ServerRef<S, T>,
         connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
         events: &Vec<fn(ConnectionRef<S, T>, &T)>,
@@ -79,6 +81,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
     }
 
     pub fn handle_connection_write(
+        rf: ServerRef<S, T>,
         connection: Arc<Mutex<ServerConnection<S, T>>>,
         event: &Event,
         events: &Vec<fn(ConnectionRef<S, T>, &T)>,
@@ -111,6 +114,8 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
             rf.stream.write_all(buf.as_mut_array()).unwrap();
         }
         rf.packet_queue.clear();
+        rf.stream.flush();
+
         false
     }
 }
