@@ -17,6 +17,7 @@ fn client_provider(client: &mut Client<ProtocolState, Packets>) -> &mut Client<P
         .on_connect(|clr| {
             println!("Started connection");
             clr.set_state(ProtocolState::Chat);
+            clr.send_packet(Packets::C2SChatMessage);
         })
         .with_packet_event(|connection, packet| {
             match packet {

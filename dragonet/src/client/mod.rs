@@ -88,17 +88,22 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             client: Arc::new(Mutex::new(self)),
         };
 
-        let func = {
-            rf.lock().on_connection.clone()
-        };
-        func(rf.clone());
+        
 
+        let mut had_writing_opportunity = false;
+        
         loop {
             poll.poll(&mut events, None);
 
             for event in events.iter() {
                 println!("wow {:?}", event);
 
+                if event.is_writable() && !had_writing_opportunity {
+                    let func = {
+                        rf.lock().on_connection.clone()
+                    };
+                    func(rf.clone());
+                }
                 match event.token() {
                     SERVER_TOKEN => {
                         if Self::handle_connection_event(rf.clone(), event) {

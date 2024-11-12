@@ -20,7 +20,6 @@ fn server_provider(server: &mut Server<ProtocolState, Packets>) -> &mut Server<P
         .with_connection_event(|connection| {
             println!("Started connection");
             connection.set_state(ProtocolState::Chat);
-            connection.send_packet(Packets::S2CChatMessage);
         })
         .with_packet_event(|connection, packet| {
             match packet {
