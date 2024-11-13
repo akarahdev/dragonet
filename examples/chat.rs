@@ -17,26 +17,35 @@ impl PacketState for ProtocolState {
 
 #[derive(Debug)]
 pub enum Packets {
-    C2SChatMessage,
-    S2CChatMessage,
+    C2SChatMessage(String),
+    S2CChatMessage(String),
 }
 
 impl Protocol<ProtocolState> for Packets {
     fn encode(&self) -> Buffer {
-        Buffer::new()
+        let mut buf = Buffer::new();
+        match self {
+            Packets::C2SChatMessage(str) => {
+                buf.write_string(str);
+            }
+            Packets::S2CChatMessage(str) => {
+                buf.write_string(str);
+            }
+        };
+        buf
     }
 
     fn decode(buf: &mut Buffer, meta: &PacketMetadata<ProtocolState>) -> Self {
         match meta.direction {
             PacketDirection::Clientbound => match meta.state {
                 ProtocolState::Chat => match meta.id {
-                    0x00 => Packets::S2CChatMessage,
+                    0x00 => Packets::S2CChatMessage(buf.read_string()),
                     _ => panic!("unknown packet"),
                 }
             }
             PacketDirection::Serverbound =>  match meta.state {
                 ProtocolState::Chat => match meta.id {
-                    0x00 => Packets::C2SChatMessage,
+                    0x00 => Packets::C2SChatMessage(buf.read_string()),
                     _ => panic!("unknown packet"),
                 }
             }
@@ -49,12 +58,12 @@ impl Protocol<ProtocolState> for Packets {
 
     fn metadata(&self) -> PacketMetadata<ProtocolState> {
         match self {
-            Packets::C2SChatMessage => PacketMetadata {
+            Packets::C2SChatMessage(msg) => PacketMetadata {
                 id: 0,
                 state: ProtocolState::Chat,
                 direction: PacketDirection::Serverbound,
             },
-            Packets::S2CChatMessage => PacketMetadata {
+            Packets::S2CChatMessage(msg) => PacketMetadata {
                 id: 0,
                 state: ProtocolState::Chat,
                 direction: PacketDirection::Clientbound,

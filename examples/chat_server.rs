@@ -19,12 +19,8 @@ fn server_provider(server: &mut Server<ProtocolState, Packets>) -> &mut Server<P
         })
         .with_packet_event(|connection, packet| {
             match packet {
-                Packets::C2SChatMessage => {
-                    println!("Received chat message on server!");
-                    std::thread::spawn(move || {
-                        std::thread::sleep(Duration::from_millis(1000));
-                        connection.send_packet(Packets::S2CChatMessage);
-                    }).join().unwrap();
+                Packets::C2SChatMessage(msg) => {
+                    println!("Message: {}", msg)
                 }
                 _ => panic!("got clientbound packet somehow!")
             }
