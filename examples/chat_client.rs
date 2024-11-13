@@ -4,13 +4,9 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
 use chat::{Packets, ProtocolState};
 use dragonet::client::Client;
+use dragonet_macros::client;
 
-pub fn main() {
-    let mut client: Client<ProtocolState, Packets> = Client::new();
-    client_provider(&mut client);
-    client.event_loop();
-}
-
+#[dragonet_macros::client]
 fn client_provider(client: &mut Client<ProtocolState, Packets>) -> &mut Client<ProtocolState, Packets> {
     client
         .with_address(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 2000))

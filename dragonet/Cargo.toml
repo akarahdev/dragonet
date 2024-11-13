@@ -7,3 +7,4 @@ license = "Apache-2.0"
 
 [dependencies]
 mio = { version = "1.0.2", features = ["net", "os-poll"]}
+dragonet-macros = { path = "../dragonet-macros" }

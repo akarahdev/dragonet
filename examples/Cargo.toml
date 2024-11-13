@@ -7,7 +7,7 @@ license = "Apache-2.0"
 
 [dev-dependencies]
 dragonet = { path = "../dragonet" }
-
+dragonet-macros = { path = "../dragonet-macros" }
 
 [[example]]
 name = "chat_server"
