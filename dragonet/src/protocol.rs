@@ -1,4 +1,4 @@
-use crate::buffer::PacketBuf;
+use crate::buffer::Buffer;
 
 #[derive(Clone, Copy)]
 pub enum PacketDirection {
@@ -18,8 +18,8 @@ pub struct PacketMetadata<S: PacketState> {
 }
 
 pub trait Protocol<S: PacketState> {
-    fn encode(&self) -> PacketBuf;
-    fn decode(buf: &mut PacketBuf, meta: &PacketMetadata<S>) -> Self;
+    fn encode(&self) -> Buffer;
+    fn decode(buf: &mut Buffer, meta: &PacketMetadata<S>) -> Self;
     fn size_of(&self) -> u32;
     fn metadata(&self) -> PacketMetadata<S>;
 }

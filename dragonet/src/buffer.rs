@@ -1,27 +1,27 @@
 use std::ops::{BitAnd, BitOr, Not, Shl};
 
 #[derive(Debug)]
-pub struct PacketBuf {
+pub struct Buffer {
     vector: Vec<u8>,
     read_index: usize,
 }
 
-impl Default for PacketBuf {
+impl Default for Buffer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl PacketBuf {
-    pub fn new() -> PacketBuf {
-        PacketBuf {
+impl Buffer {
+    pub fn new() -> Buffer {
+        Buffer {
             vector: vec![],
             read_index: 0,
         }
     }
 
-    pub fn with_capacity(capacity: usize) -> PacketBuf {
-        PacketBuf {
+    pub fn with_capacity(capacity: usize) -> Buffer {
+        Buffer {
             vector: vec![0; capacity],
             read_index: 0,
         }
@@ -55,7 +55,7 @@ impl PacketBuf {
         self.read_index = 0;
     }
 
-    pub fn write_all(&mut self, buf: &PacketBuf) {
+    pub fn write_all(&mut self, buf: &Buffer) {
         self.vector.extend_from_slice(&buf.vector);
     }
 
@@ -217,9 +217,9 @@ impl PacketBuf {
         loop {
             let current_byte = self.read_u8();
 
-            value |= (current_byte as i64 & (PacketBuf::SEGMENT_BITS)) << position;
+            value |= (current_byte as i64 & (Buffer::SEGMENT_BITS)) << position;
 
-            if (current_byte & (PacketBuf::CONTINUE_BIT as u8)) == 0 { break; }
+            if (current_byte & (Buffer::CONTINUE_BIT as u8)) == 0 { break; }
 
             position += 7;
         }
@@ -231,12 +231,12 @@ impl PacketBuf {
         let mut position = 0;
 
         loop {
-            if (value & !PacketBuf::SEGMENT_BITS) == 0 {
+            if (value & !Buffer::SEGMENT_BITS) == 0 {
                 self.write_u8(value as u8);
                 return;
             }
 
-            self.write_u8((((value & 0xFF) & PacketBuf::SEGMENT_BITS) | PacketBuf::CONTINUE_BIT) as u8);
+            self.write_u8((((value & 0xFF) & Buffer::SEGMENT_BITS) | Buffer::CONTINUE_BIT) as u8);
 
             value = ((value as u64) >> 7) as i64;
         }
@@ -292,11 +292,11 @@ impl PacketBuf {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::buffer::PacketBuf;
+    use crate::buffer::Buffer;
 
     #[test]
     pub fn test_buffer() {
-        let mut buf = PacketBuf::new();
+        let mut buf = Buffer::new();
         buf.write_var_int(328033232455);
         println!("{:?}", buf.vector);
         println!("{}", buf.read_var_int());

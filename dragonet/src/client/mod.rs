@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use mio::event::Event;
-use crate::buffer::PacketBuf;
+use crate::buffer::Buffer;
 use crate::client::refs::ClientRef;
 use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
 

@@ -1,4 +1,4 @@
-use dragonet::buffer::PacketBuf;
+use dragonet::buffer::Buffer;
 use dragonet::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
 
 #[derive(Clone, Copy)]
@@ -22,11 +22,11 @@ pub enum Packets {
 }
 
 impl Protocol<ProtocolState> for Packets {
-    fn encode(&self) -> PacketBuf {
-        PacketBuf::new()
+    fn encode(&self) -> Buffer {
+        Buffer::new()
     }
 
-    fn decode(buf: &mut PacketBuf, meta: &PacketMetadata<ProtocolState>) -> Self {
+    fn decode(buf: &mut Buffer, meta: &PacketMetadata<ProtocolState>) -> Self {
         match meta.direction {
             PacketDirection::Clientbound => match meta.state {
                 ProtocolState::Chat => match meta.id {

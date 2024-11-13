@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use mio::event::Event;
-use crate::buffer::PacketBuf;
+use crate::buffer::Buffer;
 use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
 use crate::server::conn::ServerConnection;
 use crate::server::refs::{ConnectionRef, ServerRef};

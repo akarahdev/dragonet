@@ -1,7 +1,7 @@
 use std::io::ErrorKind::{Interrupted, WouldBlock};
 use std::io::{Read, Write};
 use mio::event::Event;
-use crate::buffer::PacketBuf;
+use crate::buffer::Buffer;
 use crate::client::Client;
 use crate::client::refs::ClientRef;
 use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
@@ -27,7 +27,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
         event: &Event,
     ) -> bool {
         let mut connection_closed = false;
-        let mut data_buf = PacketBuf::with_capacity(1024);
+        let mut data_buf = Buffer::with_capacity(1024);
         let mut bytes_read = 0;
 
 
@@ -86,7 +86,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
         if !r.packet_queue.is_empty() {
             let packet = r.packet_queue.remove(0);
             let length = packet.size_of();
-            let mut buf = PacketBuf::new();
+            let mut buf = Buffer::new();
             buf.write_var_int(length as i64);
             buf.write_var_int(packet.metadata().id as i64);
             buf.write_all(&packet.encode());
