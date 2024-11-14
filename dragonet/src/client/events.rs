@@ -85,11 +85,11 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
 
         if !r.packet_queue.is_empty() {
             let packet = r.packet_queue.remove(0);
-            let length = packet.size_of();
+            let encoded = packet.encode();
             let mut buf = Buffer::new();
-            buf.write_var_int(length as i64);
+            buf.write_var_int(encoded.length() as i64);
             buf.write_var_int(packet.metadata().id as i64);
-            buf.write_all(&packet.encode());
+            buf.write_all(&encoded);
             r.socket.as_mut().unwrap().write_all(buf.as_mut_array()).unwrap();
         }
 

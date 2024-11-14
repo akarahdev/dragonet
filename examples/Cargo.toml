@@ -16,3 +16,7 @@ path = "chat_client.rs"
 [[example]]
 name = "chat_server"
 path = "chat_server.rs"
+
+[[example]]
+name = "chat_test"
+path = "chat_test.rs"

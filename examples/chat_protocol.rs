@@ -17,6 +17,7 @@ impl PacketState for ProtocolState {
     }
 }
 
+#[derive(Debug)]
 pub enum Packets {
     ServerboundChatMessage(String),
     ClientboundChatMessage(String)
@@ -51,10 +52,6 @@ impl Protocol<ProtocolState> for Packets {
                     _ => panic!("unknown packet")
                 }
         }
-    }
-
-    fn size_of(&self) -> u32 {
-        todo!()
     }
 
     fn metadata(&self) -> PacketMetadata<ProtocolState> {

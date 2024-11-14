@@ -106,11 +106,12 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         let mut rf = cl.lock().unwrap();
         while !rf.packet_queue.is_empty() {
             let packet = rf.packet_queue.remove(0);
-            let length = packet.size_of();
+            let tmp_buffer = packet.encode();
+            let length = tmp_buffer.length();
             let mut buf = Buffer::new();
             buf.write_var_int(length as i64);
             buf.write_var_int(packet.metadata().id as i64);
-            buf.write_all(&packet.encode());
+            buf.write_all(&tmp_buffer);
             rf.stream.write_all(buf.as_mut_array()).unwrap();
         }
         rf.packet_queue.clear();

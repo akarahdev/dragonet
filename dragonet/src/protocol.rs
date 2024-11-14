@@ -20,6 +20,5 @@ pub struct PacketMetadata<S: PacketState> {
 pub trait Protocol<S: PacketState> {
     fn encode(&self) -> Buffer;
     fn decode(buf: &mut Buffer, meta: &PacketMetadata<S>) -> Self;
-    fn size_of(&self) -> u32;
     fn metadata(&self) -> PacketMetadata<S>;
 }

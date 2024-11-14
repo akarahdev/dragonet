@@ -1,3 +1,4 @@
+use std::io::stdin;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use dragonet::client::Client;
 use dragonet::protocol::PacketState;
@@ -10,4 +11,21 @@ pub mod chat_protocol;
 pub fn client_provider(client: &mut Client<ProtocolState, Packets>) -> &mut Client<ProtocolState, Packets> {
     client
         .with_address(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 2000))
+        .on_connect(|crf| {
+            std::thread::spawn(move || {
+                loop {
+                    let mut line = String::new();
+                    stdin().read_line(&mut line).unwrap();
+                    crf.send_packet(Packets::ServerboundChatMessage(line));
+                }
+            });
+        })
+        .with_packet_event(|crf, packet| {
+            match packet {
+                Packets::ClientboundChatMessage(message) => {
+                    println!("> {}", message)
+                }
+                _ => panic!("got serverboudn packet {:?}", packet)
+            }
+        })
 }
