@@ -8,3 +8,11 @@ license = "Apache-2.0"
 [dev-dependencies]
 dragonet = { path = "../dragonet" }
 dragonet-macros = { path = "../dragonet-macros" }
+
+[[example]]
+name = "chat_client"
+path = "chat_client.rs"
+
+[[example]]
+name = "chat_server"
+path = "chat_server.rs"
