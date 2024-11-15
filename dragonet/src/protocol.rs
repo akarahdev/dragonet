@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use crate::buffer::Buffer;
 
 #[derive(Clone, Copy)]
@@ -17,7 +18,7 @@ pub struct PacketMetadata<S: PacketState> {
     pub direction: PacketDirection
 }
 
-pub trait Protocol<S: PacketState> {
+pub trait Protocol<S: PacketState>: Debug {
     fn encode(&self) -> Buffer;
     fn decode(buf: &mut Buffer, meta: &PacketMetadata<S>) -> Self;
     fn metadata(&self) -> PacketMetadata<S>;

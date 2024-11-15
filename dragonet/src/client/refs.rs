@@ -32,7 +32,9 @@ where
     }
 
     pub fn send_packet(&self, packet: T) {
+        println!("sending packet {:?}", packet);
         self.client.lock().unwrap().packet_queue.push(packet);
+        println!("{:?}", self.client.lock().unwrap().packet_queue);
     }
 
     pub(crate) fn lock(&self) -> MutexGuard<'_, Client<S, T>> {

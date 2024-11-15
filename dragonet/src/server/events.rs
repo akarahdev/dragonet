@@ -64,10 +64,13 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
 
             let length = data_buf.read_var_int();
             let id = data_buf.read_var_int();
-            let meta = PacketMetadata {
-                id: id as u32,
-                state: connection.clone().lock().unwrap().state.clone().unwrap(),
-                direction: PacketDirection::Serverbound,
+            let meta = match connection.clone().lock().unwrap().state.clone() {
+                Some(s) => PacketMetadata {
+                    id: id as u32,
+                    state: s,
+                    direction: PacketDirection::Serverbound,
+                },
+                None => panic!("server must give the client a valid state")
             };
             let packet = T::decode(&mut data_buf, &meta);
 

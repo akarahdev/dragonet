@@ -11,6 +11,7 @@ use std::marker::PhantomData;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::time::Duration;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use mio::event::Event;
@@ -108,9 +109,7 @@ impl<S: PacketState, T: Protocol<S>> Server<S, T> {
         }
         
         loop {
-            poll.poll(&mut events, None);
-
-            println!("wow");
+            poll.poll(&mut events, Some(Duration::from_millis(5)));
 
             for event in events.iter() {
                 println!("Event: {:?}", event);

@@ -59,10 +59,13 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
 
             let length = data_buf.read_var_int();
             let id = data_buf.read_var_int();
-            let meta = PacketMetadata {
-                id: id as u32,
-                state: rf.lock().state.clone().unwrap(),
-                direction: PacketDirection::Clientbound,
+            let meta = match rf.lock().state.clone() {
+                Some(s) => PacketMetadata {
+                    id: id as u32,
+                    state: s,
+                    direction: PacketDirection::Clientbound,
+                },
+                None => panic!("error: the client must set a state on the connection event!")
             };
             let packet = T::decode(&mut data_buf, &meta);
             let events = rf.lock().events.clone();
@@ -85,6 +88,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
 
         if !r.packet_queue.is_empty() {
             let packet = r.packet_queue.remove(0);
+            println!("packet: {:?}", packet);
             let encoded = packet.encode();
             let mut buf = Buffer::new();
             buf.write_var_int(encoded.length() as i64);

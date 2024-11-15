@@ -10,6 +10,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use mio::event::Event;
@@ -90,17 +91,16 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
             client: Arc::new(Mutex::new(self)),
         };
 
-        
-
         let mut had_writing_opportunity = false;
         
         loop {
-            poll.poll(&mut events, None);
+            poll.poll(&mut events, Some(Duration::from_millis(5)));
 
             for event in events.iter() {
                 println!("wow {:?}", event);
 
                 if event.is_writable() && !had_writing_opportunity {
+                    had_writing_opportunity = true;
                     let func = {
                         rf.lock().on_connection
                     };

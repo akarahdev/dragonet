@@ -14,7 +14,9 @@ pub fn server_provider_impl(server: &mut Server<ProtocolState, Packets>) -> &mut
     server
         .with_address(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 2000))
         .with_connection_event(|conn| {
-            println!("Connected!")
+            println!("Connected!");
+            conn.set_state(ProtocolState::Chat);
+            conn.send_packet(Packets::ClientboundChatMessage("You connected! Hi!".to_string()))
         })
         .with_packet_event(|conn, packet| {
             conn.send_packet(Packets::ClientboundChatMessage("Recv".to_string()));

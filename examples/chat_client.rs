@@ -12,10 +12,13 @@ pub fn client_provider(client: &mut Client<ProtocolState, Packets>) -> &mut Clie
     client
         .with_address(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 2000))
         .on_connect(|crf| {
+            crf.send_packet(Packets::ServerboundChatMessage("I connected!".to_string()));
             std::thread::spawn(move || {
+                crf.set_state(ProtocolState::Chat);
                 loop {
                     let mut line = String::new();
                     stdin().read_line(&mut line).unwrap();
+                    println!("{}", line);
                     crf.send_packet(Packets::ServerboundChatMessage(line));
                 }
             });

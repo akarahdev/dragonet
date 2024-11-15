@@ -48,7 +48,7 @@ impl Protocol<ProtocolState> for Packets {
                 }
             PacketDirection::Clientbound =>
                 match meta.id {
-                    0 => ServerboundChatMessage(buf.read_string()),
+                    0 => ClientboundChatMessage(buf.read_string()),
                     _ => panic!("unknown packet")
                 }
         }
