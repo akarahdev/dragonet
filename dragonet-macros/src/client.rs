@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse2, ItemFn, ReturnType, Token, Type, TypeReference};
+use syn::{parse2, ItemFn};
 
 pub fn client_impl(item: TokenStream) -> TokenStream {
     println!("{}", item.to_string());

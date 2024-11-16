@@ -1,19 +1,15 @@
 mod refs;
-mod events;
 
 use std::any::Any;
 use std::collections::HashMap;
 use std::io::ErrorKind::{Interrupted, WouldBlock};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6, TcpStream};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
-use mio::net::{TcpListener, TcpStream};
-use mio::{Events, Interest, Poll, Token};
-use mio::event::Event;
 use crate::buffer::Buffer;
 use crate::client::refs::ClientRef;
 use crate::protocol::{PacketDirection, PacketMetadata, PacketState, Protocol};
@@ -70,52 +66,7 @@ impl<S: PacketState, T: Protocol<S>> Client<S, T> {
     }
 
     pub fn event_loop(mut self) {
-        const SERVER_TOKEN: Token = Token(0);
-
-        let mut poll = Poll::new().unwrap();
-        let mut events = Events::with_capacity(128);
-
-        let Some(socket) = &mut self.socket else {
-            panic!("
-    > ERROR
-    | your client does not have an address configured
-    | help: please use Client#with_address on your function labelled #[dragonet::client]
-            ");
-        };
-
-        poll.registry()
-            .register(socket, SERVER_TOKEN, Interest::READABLE | Interest::WRITABLE);
-
-
-        let rf = ClientRef {
-            client: Arc::new(Mutex::new(self)),
-        };
-
-        let mut had_writing_opportunity = false;
         
-        loop {
-            poll.poll(&mut events, Some(Duration::from_millis(5)));
-
-            for event in events.iter() {
-                println!("wow {:?}", event);
-
-                if event.is_writable() && !had_writing_opportunity {
-                    had_writing_opportunity = true;
-                    let func = {
-                        rf.lock().on_connection
-                    };
-                    func(rf.clone());
-                }
-                match event.token() {
-                    SERVER_TOKEN => {
-                        if Self::handle_connection_event(rf.clone(), event) {
-                            return;
-                        }
-                    }
-                    _ => panic!("unknown token")
-                }
-            }
-        }
     }
 }
 

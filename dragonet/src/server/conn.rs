@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
-use mio::net::TcpStream;
-use mio::Token;
+use std::net::TcpStream;
 use crate::protocol::{PacketState, Protocol};
 
 pub struct ServerConnection<S, T>
@@ -8,7 +7,6 @@ where
     S: PacketState,
     T: Protocol<S>,
 {
-    pub(crate) token: Token,
     pub(crate) stream: TcpStream,
     pub(crate) packet_queue: Vec<T>,
     pub(crate) state: Option<S>,

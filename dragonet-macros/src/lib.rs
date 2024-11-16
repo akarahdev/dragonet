@@ -2,7 +2,6 @@ mod server;
 mod client;
 
 use proc_macro::{TokenStream};
-use quote::quote;
 use crate::client::client_impl;
 use crate::server::server_impl;
 
