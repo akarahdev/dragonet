@@ -1,14 +1,16 @@
 #![cfg(test)]
 
+use std::sync::Mutex;
 use crate::Runtime;
+
+
 
 #[test]
 fn basic_runtime() {
-    let mut rt = Runtime::new();
-    rt.spawn(async {
+    Runtime::spawn(async {
         runtime_example().await;
     });
-    rt.run();
+    Runtime::run();
 }
 
 async fn runtime_example() {

@@ -3,11 +3,13 @@ mod tests;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::task::{Context, Poll};
 use futures::task;
-use futures::task::ArcWake;
+use futures::task::{ArcWake, SpawnExt};
+
+static GLOBAL_RUNTIME: Mutex<Runtime> = Mutex::new(Runtime::new());
 
 struct Runtime {
     scheduled: Receiver<Arc<Task>>,
@@ -15,7 +17,7 @@ struct Runtime {
 }
 
 impl Runtime {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let mpsc = channel();
         Runtime {
             scheduled: mpsc.1,
@@ -23,7 +25,7 @@ impl Runtime {
         }
     }
 
-    pub fn spawn<F>(&mut self, future: F)
+    fn spawn_internal<F>(&mut self, future: F)
         where F: Future<Output=()> + Send  + 'static {
         self.sender.send(Arc::new(Task {
             data: Mutex::new(TaskFutureData {
@@ -34,12 +36,25 @@ impl Runtime {
         })).expect("failed to send future somehow");
     }
 
-    fn run(&mut self) {
+    fn run_internal(&mut self) {
         while let Ok(task) = self.scheduled.recv() {
             println!("Task: {:?}", task);
             task.poll();
         }
     }
+
+    pub fn get() -> MutexGuard<'_, Runtime> {
+        GLOBAL_RUNTIME.lock().unwrap()
+    }
+
+    pub fn run() {
+        GLOBAL_RUNTIME.lock().unwrap().run_internal();
+    }
+
+    pub fn spawn(future: impl Future<Output=()> + 'static + Send) {
+        GLOBAL_RUNTIME.lock().unwrap().spawn(future).expect("TODO: panic message");
+    }
+
 }
 
 #[derive(Debug)]
