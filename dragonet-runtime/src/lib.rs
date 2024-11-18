@@ -9,15 +9,13 @@ use std::task::{Context, Poll};
 use futures::task;
 use futures::task::{ArcWake, SpawnExt};
 
-static GLOBAL_RUNTIME: Mutex<Runtime> = Mutex::new(Runtime::new());
-
-struct Runtime {
+pub struct Runtime {
     scheduled: Receiver<Arc<Task>>,
     sender: Sender<Arc<Task>>,
 }
 
 impl Runtime {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let mpsc = channel();
         Runtime {
             scheduled: mpsc.1,
@@ -25,7 +23,7 @@ impl Runtime {
         }
     }
 
-    fn spawn_internal<F>(&mut self, future: F)
+    pub fn spawn<F>(&mut self, future: F)
         where F: Future<Output=()> + Send  + 'static {
         self.sender.send(Arc::new(Task {
             data: Mutex::new(TaskFutureData {
@@ -36,25 +34,14 @@ impl Runtime {
         })).expect("failed to send future somehow");
     }
 
-    fn run_internal(&mut self) {
+    pub fn run(&mut self) {
         while let Ok(task) = self.scheduled.recv() {
             println!("Task: {:?}", task);
-            task.poll();
+            std::thread::spawn(move || {
+                task.poll();
+            });
         }
     }
-
-    pub fn get() -> MutexGuard<'_, Runtime> {
-        GLOBAL_RUNTIME.lock().unwrap()
-    }
-
-    pub fn run() {
-        GLOBAL_RUNTIME.lock().unwrap().run_internal();
-    }
-
-    pub fn spawn(future: impl Future<Output=()> + 'static + Send) {
-        GLOBAL_RUNTIME.lock().unwrap().spawn(future).expect("TODO: panic message");
-    }
-
 }
 
 #[derive(Debug)]
