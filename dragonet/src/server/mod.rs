@@ -20,8 +20,6 @@ static mut CONNECTION_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 type ServerPacketEvent<S, T> = fn(ConnectionRef<S, T>, &T);
 
-
-
 pub struct Server<S, T>
 where
     S: PacketState,

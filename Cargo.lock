@@ -7,6 +7,7 @@ name = "dragonet"
 version = "0.0.0"
 dependencies = [
  "dragonet-macros",
+ "dragonet-runtime",
 ]
 
 [[package]]
@@ -17,6 +18,10 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "dragonet-runtime"
+version = "0.1.0"
 
 [[package]]
 name = "examples"
